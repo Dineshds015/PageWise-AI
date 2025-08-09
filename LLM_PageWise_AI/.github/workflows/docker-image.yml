@@ -1,0 +1,46 @@
+name: CICD
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Source
+      uses: actions/checkout@v4
+
+    - name: Login to DockerHub
+      run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build Docker Image
+      run: docker build -t vaibhavyadav350/llm-laptop-search-backend .
+
+    - name: Publish Image to DockerHub 
+      run: docker push vaibhavyadav350/llm-laptop-search-backend:latest
+
+  deploy:
+    needs: build
+    runs-on: [self-hosted, linux, x64]
+    steps:
+    - run: echo "Runner is working!!! Connected to EC2"
+
+    - name: Pull image from Docker Hub
+      run: docker pull vaibhavyadav350/llm-laptop-search-backend:latest
+
+    - name: Delete old container
+      run: docker rm -f llm-laptop-search-container || true
+
+    - name: Create directory for env file
+      run: mkdir -p /home/ubuntu/LLM_Local_Laptop_Search
+
+    - name: Write .env file to EC2
+      run: echo "${{ secrets.ENV_FILE }}" > /home/ubuntu/LLM_Local_Laptop_Search/.env
+
+    - name: Run Docker container with env
+      run: |
+        docker run -d -p 7001:7001 \
+          --env-file /home/ubuntu/LLM_Local_Laptop_Search/.env \
+          --name llm-laptop-search-container \
+          vaibhavyadav350/llm-laptop-search-backend:latest

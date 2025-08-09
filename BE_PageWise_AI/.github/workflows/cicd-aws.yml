@@ -1,0 +1,45 @@
+name: CICD - Local Laptop Search Backend
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Login to DockerHub
+        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker Image
+        run: docker build -t vaibhavyadav350/local-laptop-search-backend .
+
+      - name: Push Docker Image to DockerHub
+        run: docker push vaibhavyadav350/local-laptop-search-backend:latest
+
+  deploy:
+    needs: build
+    runs-on: [self-hosted, linux, x64]
+
+    steps:
+      - name: Pull Image from DockerHub Network
+        run: docker pull vaibhavyadav350/local-laptop-search-backend:latest
+
+      - name: Delete Existing Container if Exists
+        run: docker rm -f local-laptop-search-container || true
+
+      - name: Create .env Directory
+        run: mkdir -p /home/ubuntu/BE_Local_Laptop_Search
+
+      - name: Write .env to EC2
+        run: echo "${{ secrets.ENV_FILE }}" > /home/ubuntu/BE_Local_Laptop_Search/.env
+
+      - name: Run Docker Container
+        run: |
+          docker run -d -p 6001:6001 \
+            --env-file /home/ubuntu/BE_Local_Laptop_Search/.env \
+            --name local-laptop-search-container \
+            vaibhavyadav350/local-laptop-search-backend:latest
